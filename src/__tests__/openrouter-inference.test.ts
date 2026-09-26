@@ -15,7 +15,13 @@ describe("OpenRouter inference backend", () => {
         JSON.stringify({
           id: "or-test-1",
           model: "nousresearch/hermes-3-llama-3.1-70b",
-          choices: [{ message: { role: "assistant", content: "ready" }, finish_reason: "stop" }],
+          choices: [{
+            message: {
+              role: "assistant",
+              content: '<actions>[{"tool":"write_file","arguments":{"path":"note.txt","content":"ready"}}]</actions>',
+            },
+            finish_reason: "stop",
+          }],
           usage: { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 },
         }),
         { status: 200, headers: { "content-type": "application/json" } },
@@ -47,7 +53,10 @@ describe("OpenRouter inference backend", () => {
       },
     );
 
-    expect(response.message.content).toBe("ready");
+    expect(response.message.content).toContain("<actions>");
+    expect(response.toolCalls).toEqual([
+      expect.objectContaining({ function: { name: "write_file", arguments: '{"path":"note.txt","content":"ready"}' } }),
+    ]);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, request] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
@@ -55,5 +64,7 @@ describe("OpenRouter inference backend", () => {
     const body = JSON.parse(String(request.body));
     expect(body.model).toBe("nousresearch/hermes-3-llama-3.1-70b");
     expect(body.tools).toBeUndefined();
+    expect(body.messages[0]).toMatchObject({ role: "system" });
+    expect(body.messages[0].content).toContain("<actions>");
   });
 });

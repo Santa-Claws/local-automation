@@ -15,6 +15,7 @@ import type {
   InferenceToolDefinition,
 } from "../types.js";
 import { ResilientHttpClient } from "./http-client.js";
+import { parseStructuredActions, structuredActionInstruction } from "../agent/structured-actions.js";
 
 const INFERENCE_TIMEOUT_MS = 60_000;
 
@@ -79,9 +80,20 @@ export function createInferenceClient(
       backend !== "ollama" && /^(o[1-9]|gpt-5|gpt-4\.1)/.test(model);
     const tokenLimit = opts?.maxTokens || maxTokens;
 
+    const formattedMessages = messages.map(formatMessage);
+    if (backend === "openrouter" && tools?.length) {
+      const instruction = structuredActionInstruction(tools);
+      const first = formattedMessages[0];
+      if (first?.role === "system" && typeof first.content === "string") {
+        first.content = `${first.content}\n\n${instruction}`;
+      } else {
+        formattedMessages.unshift({ role: "system", content: instruction });
+      }
+    }
+
     const body: Record<string, unknown> = {
       model,
-      messages: messages.map(formatMessage),
+      messages: formattedMessages,
       stream: false,
     };
 
@@ -131,6 +143,7 @@ export function createInferenceClient(
       apiUrl: openAiLikeApiUrl,
       apiKey: openAiLikeApiKey,
       backend,
+      structuredTools: backend === "openrouter" ? tools : undefined,
       httpClient,
     });
   };
@@ -215,6 +228,7 @@ async function chatViaOpenAiCompatible(params: {
   apiUrl: string;
   apiKey: string;
   backend: "conway" | "openai" | "openrouter" | "ollama";
+  structuredTools?: InferenceToolDefinition[];
   httpClient: ResilientHttpClient;
 }): Promise<InferenceResponse> {
   const resp = await params.httpClient.request(`${params.apiUrl}/v1/chat/completions`, {
@@ -251,7 +265,7 @@ async function chatViaOpenAiCompatible(params: {
     totalTokens: data.usage?.total_tokens || 0,
   };
 
-  const toolCalls: InferenceToolCall[] | undefined =
+  const nativeToolCalls: InferenceToolCall[] | undefined =
     message.tool_calls?.map((tc: any) => ({
       id: tc.id,
       type: "function" as const,
@@ -260,6 +274,11 @@ async function chatViaOpenAiCompatible(params: {
         arguments: tc.function.arguments,
       },
     }));
+  const toolCalls = nativeToolCalls || (
+    params.backend === "openrouter"
+      ? parseStructuredActions(message.content || "", params.structuredTools)
+      : undefined
+  );
 
   return {
     id: data.id || "",
