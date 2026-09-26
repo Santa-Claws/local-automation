@@ -1,7 +1,7 @@
 {
-  "name": "@conway/automaton",
-  "version": "0.2.1",
-  "description": "Conway Automaton - Sovereign AI Agent Runtime",
+  "name": "@santa-claws/local-automation",
+  "version": "0.2.1-local.0",
+  "description": "Self-hosted autonomous agent runtime with local infrastructure and wallet controls",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,20 +20,18 @@
     }
   },
   "bin": {
-    "automaton": "dist/index.js",
-    "conway-automaton": "dist/index.js"
+    "local-automation": "dist/index.js"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Conway-Research/automaton.git"
+    "url": "https://github.com/Santa-Claws/local-automation.git"
   },
-  "homepage": "https://conway.tech",
+  "homepage": "https://github.com/Santa-Claws/local-automation",
   "keywords": [
     "autonomous-agent",
-    "sovereign-ai",
-    "web4",
-    "conway",
-    "self-replicating"
+    "self-hosted",
+    "wallet-agent",
+    "local-automation"
   ],
   "license": "MIT",
   "packageManager": "pnpm@10.28.1",

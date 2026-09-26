@@ -1,12 +1,12 @@
 {
-  "name": "@conway/automaton-cli",
-  "version": "0.2.0",
-  "description": "Conway Automaton - Creator CLI",
+  "name": "@santa-claws/local-automation-cli",
+  "version": "0.2.1-local.0",
+  "description": "Local Automation operator CLI",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "automaton-cli": "dist/index.js"
+    "local-automation-cli": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@conway/automaton": "workspace:*",
+    "@santa-claws/local-automation": "workspace:*",
     "chalk": "^5.3.0",
     "viem": "^2.44.2"
   },
