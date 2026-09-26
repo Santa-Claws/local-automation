@@ -49,6 +49,12 @@ export interface AutomatonConfig {
   sandboxId: string;
   conwayApiUrl: string;
   conwayApiKey: string;
+  /** Runtime provider. Local mode is the safe default for this fork. */
+  runtimeMode?: "local" | "conway";
+  /** OpenRouter secret; prefer OPENROUTER_API_KEY over persisted config. */
+  openrouterApiKey?: string;
+  /** Directory where the local provider permits agent file operations. */
+  workspaceRoot?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
   ollamaBaseUrl?: string;
@@ -79,6 +85,8 @@ export interface AutomatonConfig {
 
 export const DEFAULT_CONFIG: Partial<AutomatonConfig> = {
   conwayApiUrl: "https://api.conway.tech",
+  runtimeMode: "local",
+  workspaceRoot: "workspace",
   inferenceModel: "nousresearch/hermes-3-llama-3.1-70b",
   maxTokensPerTurn: 4096,
   heartbeatConfigPath: "~/.automaton/heartbeat.yml",
