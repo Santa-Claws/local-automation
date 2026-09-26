@@ -132,6 +132,21 @@ export const STATIC_MODEL_BASELINE: Omit<ModelEntry, "lastSeen" | "createdAt" | 
     parameterStyle: "max_completion_tokens",
     enabled: true,
   },
+  {
+    modelId: "nousresearch/hermes-3-llama-3.1-70b",
+    provider: "openrouter",
+    displayName: "Nous Hermes 3 70B Instruct",
+    tierMinimum: "normal",
+    // OpenRouter catalog price: $0.70/M input and output = 7 hundredths of a cent/1k.
+    costPer1kInput: 7,
+    costPer1kOutput: 7,
+    maxTokens: 16384,
+    contextWindow: 131072,
+    supportsTools: false,
+    supportsVision: false,
+    parameterStyle: "max_tokens",
+    enabled: true,
+  },
 ];
 
 // === Default Routing Matrix ===
@@ -178,7 +193,7 @@ export const DEFAULT_ROUTING_MATRIX: RoutingMatrix = {
 // === Default Model Strategy Config ===
 
 export const DEFAULT_MODEL_STRATEGY_CONFIG: ModelStrategyConfig = {
-  inferenceModel: "gpt-5.2",
+  inferenceModel: "nousresearch/hermes-3-llama-3.1-70b",
   lowComputeModel: "gpt-5-mini",
   criticalModel: "gpt-5-mini",
   maxTokensPerTurn: 4096,

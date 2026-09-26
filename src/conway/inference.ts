@@ -26,12 +26,13 @@ interface InferenceClientOptions {
   lowComputeModel?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
+  openrouterApiKey?: string;
   ollamaBaseUrl?: string;
   /** Optional registry lookup — if provided, used before name heuristics */
   getModelProvider?: (modelId: string) => string | undefined;
 }
 
-type InferenceBackend = "conway" | "openai" | "anthropic" | "ollama";
+type InferenceBackend = "conway" | "openai" | "openrouter" | "anthropic" | "ollama";
 
 function isLoopbackHttpUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -48,7 +49,7 @@ function isLoopbackHttpUrl(url: string | undefined): boolean {
 export function createInferenceClient(
   options: InferenceClientOptions,
 ): InferenceClient {
-  const { apiUrl, apiKey, openaiApiKey, anthropicApiKey, ollamaBaseUrl, getModelProvider } = options;
+  const { apiUrl, apiKey, openaiApiKey, anthropicApiKey, openrouterApiKey, ollamaBaseUrl, getModelProvider } = options;
   const httpClient = new ResilientHttpClient({
     baseTimeout: INFERENCE_TIMEOUT_MS,
     retryableStatuses: [429, 500, 502, 503, 504],
@@ -67,6 +68,7 @@ export function createInferenceClient(
     const backend = resolveInferenceBackend(model, {
       openaiApiKey,
       anthropicApiKey,
+      openrouterApiKey,
       ollamaBaseUrl,
       getModelProvider,
     });
@@ -93,7 +95,9 @@ export function createInferenceClient(
       body.temperature = opts.temperature;
     }
 
-    if (tools && tools.length > 0) {
+    // Hermes 3 on OpenRouter does not advertise native function calling;
+    // actions are requested through the structured-action adapter instead.
+    if (tools && tools.length > 0 && backend !== "openrouter") {
       body.tools = tools;
       body.tool_choice = "auto";
     }
@@ -112,10 +116,12 @@ export function createInferenceClient(
 
     const openAiLikeApiUrl =
       backend === "openai" ? "https://api.openai.com" :
+      backend === "openrouter" ? "https://openrouter.ai/api" :
       backend === "ollama" ? (ollamaBaseUrl as string).replace(/\/$/, "") :
       apiUrl;
     const openAiLikeApiKey =
       backend === "openai" ? (openaiApiKey as string) :
+      backend === "openrouter" ? (openrouterApiKey as string) :
       backend === "ollama" ? "ollama" :
       apiKey;
 
@@ -179,6 +185,7 @@ function resolveInferenceBackend(
   keys: {
     openaiApiKey?: string;
     anthropicApiKey?: string;
+    openrouterApiKey?: string;
     ollamaBaseUrl?: string;
     getModelProvider?: (modelId: string) => string | undefined;
   },
@@ -189,6 +196,7 @@ function resolveInferenceBackend(
     if (provider === "ollama" && keys.ollamaBaseUrl) return "ollama";
     if (provider === "anthropic" && keys.anthropicApiKey) return "anthropic";
     if (provider === "openai" && keys.openaiApiKey) return "openai";
+    if (provider === "openrouter" && keys.openrouterApiKey) return "openrouter";
     if (provider === "conway") return "conway";
     // provider unknown or key not configured — fall through to heuristics
   }
@@ -196,6 +204,7 @@ function resolveInferenceBackend(
   // Heuristic fallback (model not in registry yet)
   if (keys.anthropicApiKey && /^claude/i.test(model)) return "anthropic";
   if (keys.openaiApiKey && /^(gpt-[3-9]|gpt-4|gpt-5|o[1-9][-\s.]|o[1-9]$|chatgpt)/i.test(model)) return "openai";
+  if (keys.openrouterApiKey && model.includes("/")) return "openrouter";
   return "conway";
 
 }
@@ -205,7 +214,7 @@ async function chatViaOpenAiCompatible(params: {
   body: Record<string, unknown>;
   apiUrl: string;
   apiKey: string;
-  backend: "conway" | "openai" | "ollama";
+  backend: "conway" | "openai" | "openrouter" | "ollama";
   httpClient: ResilientHttpClient;
 }): Promise<InferenceResponse> {
   const resp = await params.httpClient.request(`${params.apiUrl}/v1/chat/completions`, {
@@ -213,9 +222,9 @@ async function chatViaOpenAiCompatible(params: {
     headers: {
       "Content-Type": "application/json",
       Authorization:
-        params.backend === "openai" || params.backend === "ollama"
-          ? `Bearer ${params.apiKey}`
-          : params.apiKey,
+        params.backend === "conway"
+          ? params.apiKey
+          : `Bearer ${params.apiKey}`,
     },
     body: JSON.stringify(params.body),
     timeout: INFERENCE_TIMEOUT_MS,
