@@ -165,14 +165,19 @@ describe("Financial Policy Rules", () => {
   });
 
   describe("financial.x402_domain_allowlist", () => {
-    it("allows requests to conway.tech domains", () => {
+    it("allows a configured payment domain", () => {
+      const enabledEngine = new PolicyEngine(db, createFinancialRules({
+        ...DEFAULT_TREASURY_POLICY,
+        maxX402PaymentCents: 100,
+        x402AllowedDomains: ["merchant.example"],
+      }));
       const request = createRequest(
         mockX402Tool(),
-        { url: "https://api.conway.tech/v1/resource" },
+        { url: "https://merchant.example/v1/resource" },
         createMockSpendTracker(),
       );
 
-      const decision = engine.evaluate(request);
+      const decision = enabledEngine.evaluate(request);
       expect(decision.action).toBe("allow");
     });
 
@@ -199,14 +204,19 @@ describe("Financial Policy Rules", () => {
       expect(decision.action).toBe("deny");
     });
 
-    it("allows subdomain of conway.tech", () => {
+    it("allows a subdomain of a configured payment domain", () => {
+      const enabledEngine = new PolicyEngine(db, createFinancialRules({
+        ...DEFAULT_TREASURY_POLICY,
+        maxX402PaymentCents: 100,
+        x402AllowedDomains: ["merchant.example"],
+      }));
       const request = createRequest(
         mockX402Tool(),
-        { url: "https://pay.conway.tech/endpoint" },
+        { url: "https://pay.merchant.example/endpoint" },
         createMockSpendTracker(),
       );
 
-      const decision = engine.evaluate(request);
+      const decision = enabledEngine.evaluate(request);
       expect(decision.action).toBe("allow");
     });
 
