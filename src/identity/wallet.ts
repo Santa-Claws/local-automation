@@ -41,18 +41,13 @@ function createSolanaStubAccount(solanaAddress: string): PrivateKeyAccount {
   } as unknown as PrivateKeyAccount;
 }
 
-const AUTOMATON_DIR = path.join(
-  process.env.HOME || "/root",
-  ".automaton",
-);
-const WALLET_FILE = path.join(AUTOMATON_DIR, "wallet.json");
-
 export function getAutomatonDir(): string {
-  return AUTOMATON_DIR;
+  const configured = process.env.LOCAL_AUTOMATION_HOME?.trim();
+  return configured || path.join(process.env.HOME || "/root", ".local-automation");
 }
 
 export function getWalletPath(): string {
-  return WALLET_FILE;
+  return path.join(getAutomatonDir(), "wallet.json");
 }
 
 /**
@@ -80,13 +75,13 @@ export async function getWallet(chainType?: ChainType): Promise<{
   chainType: ChainType;
   isNew: boolean;
 }> {
-  if (!fs.existsSync(AUTOMATON_DIR)) {
-    fs.mkdirSync(AUTOMATON_DIR, { recursive: true, mode: 0o700 });
+  if (!fs.existsSync(getAutomatonDir())) {
+    fs.mkdirSync(getAutomatonDir(), { recursive: true, mode: 0o700 });
   }
 
-  if (fs.existsSync(WALLET_FILE)) {
+  if (fs.existsSync(getWalletPath())) {
     const walletData: WalletData = JSON.parse(
-      fs.readFileSync(WALLET_FILE, "utf-8"),
+      fs.readFileSync(getWalletPath(), "utf-8"),
     );
     const resolvedChainType = walletData.chainType || "evm";
 
@@ -115,7 +110,7 @@ export async function getWallet(chainType?: ChainType): Promise<{
       createdAt: new Date().toISOString(),
     };
 
-    fs.writeFileSync(WALLET_FILE, JSON.stringify(walletData, null, 2), {
+    fs.writeFileSync(getWalletPath(), JSON.stringify(walletData, null, 2), {
       mode: 0o600,
     });
 
@@ -133,7 +128,7 @@ export async function getWallet(chainType?: ChainType): Promise<{
     createdAt: new Date().toISOString(),
   };
 
-  fs.writeFileSync(WALLET_FILE, JSON.stringify(walletData, null, 2), {
+  fs.writeFileSync(getWalletPath(), JSON.stringify(walletData, null, 2), {
     mode: 0o600,
   });
 
@@ -144,12 +139,12 @@ export async function getWallet(chainType?: ChainType): Promise<{
  * Get the wallet address without loading the full account.
  */
 export function getWalletAddress(): string | null {
-  if (!fs.existsSync(WALLET_FILE)) {
+  if (!fs.existsSync(getWalletPath())) {
     return null;
   }
 
   const walletData: WalletData = JSON.parse(
-    fs.readFileSync(WALLET_FILE, "utf-8"),
+    fs.readFileSync(getWalletPath(), "utf-8"),
   );
 
   if (walletData.chainType === "solana" && walletData.secretKey) {
@@ -167,12 +162,12 @@ export function getWalletAddress(): string | null {
  * For Solana wallets, returns a proxy account.
  */
 export function loadWalletAccount(): PrivateKeyAccount | null {
-  if (!fs.existsSync(WALLET_FILE)) {
+  if (!fs.existsSync(getWalletPath())) {
     return null;
   }
 
   const walletData: WalletData = JSON.parse(
-    fs.readFileSync(WALLET_FILE, "utf-8"),
+    fs.readFileSync(getWalletPath(), "utf-8"),
   );
 
   if (walletData.chainType === "solana") {
@@ -187,12 +182,12 @@ export function loadWalletAccount(): PrivateKeyAccount | null {
  * Get the chain type from the wallet file.
  */
 export function getWalletChainType(): ChainType {
-  if (!fs.existsSync(WALLET_FILE)) {
+  if (!fs.existsSync(getWalletPath())) {
     return "evm";
   }
   try {
     const walletData: WalletData = JSON.parse(
-      fs.readFileSync(WALLET_FILE, "utf-8"),
+      fs.readFileSync(getWalletPath(), "utf-8"),
     );
     return walletData.chainType || "evm";
   } catch {
@@ -201,5 +196,5 @@ export function getWalletChainType(): ChainType {
 }
 
 export function walletExists(): boolean {
-  return fs.existsSync(WALLET_FILE);
+  return fs.existsSync(getWalletPath());
 }

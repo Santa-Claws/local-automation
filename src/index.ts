@@ -10,11 +10,15 @@
 import fs from "fs";
 import path from "path";
 import { getWallet, getAutomatonDir } from "./identity/wallet.js";
+import { loadLocalWallet, localWalletExists } from "./identity/local-wallet.js";
+import { EvmChainIdentity } from "./identity/chain.js";
+import { privateKeyToAccount } from "viem/accounts";
 import { provision, loadApiKeyFromConfig } from "./identity/provision.js";
 import { loadConfig, resolvePath } from "./config.js";
 import { createDatabase } from "./state/database.js";
 import { createConwayClient } from "./conway/client.js";
 import { createLocalRuntimeClient } from "./runtime/local-client.js";
+import { initializeLocalRuntime } from "./runtime/local-bootstrap.js";
 import { resolveRuntimeSettings } from "./runtime/settings.js";
 import { createInferenceClient } from "./conway/inference.js";
 import { createHeartbeatDaemon } from "./heartbeat/daemon.js";
@@ -40,7 +44,13 @@ import { randomUUID } from "crypto";
 import { keccak256, toHex } from "viem";
 
 const logger = createLogger("main");
-const VERSION = "0.2.1";
+const VERSION = "0.2.1-local.0";
+
+function argumentValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  const value = index >= 0 ? args[index + 1] : undefined;
+  return value && !value.startsWith("--") ? value : undefined;
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -54,25 +64,43 @@ async function main(): Promise<void> {
 
   if (args.includes("--help") || args.includes("-h")) {
     logger.info(`
-Conway Automaton v${VERSION}
-Sovereign AI Agent Runtime
+Local Automation v${VERSION}
+Self-hosted autonomous agent runtime
 
 Usage:
-  automaton --run          Start the automaton (first run triggers setup wizard)
-  automaton --setup        Re-run the interactive setup wizard
-  automaton --configure    Edit configuration (providers, model, treasury, general)
-  automaton --pick-model   Interactively pick the active inference model
-  automaton --init         Initialize wallet and config directory
-  automaton --provision    Provision Conway API key via SIWE
-  automaton --status       Show current automaton status
-  automaton --version      Show version
-  automaton --help         Show this help
+  local-automation --init-local  Create encrypted wallet and local configuration
+  local-automation --run         Start the local agent
+  local-automation --status      Show local agent state
+  local-automation --version     Show version
+  local-automation --help        Show this help
 
 Environment:
-  CONWAY_API_URL           Conway API URL (default: https://api.conway.tech)
-  CONWAY_API_KEY           Conway API key (overrides config)
-  OLLAMA_BASE_URL          Ollama base URL (overrides config, e.g. http://localhost:11434)
+  OPENROUTER_API_KEY                     OpenRouter API key (required to run)
+  LOCAL_AUTOMATION_WALLET_PASSPHRASE     Wallet encryption passphrase (required to init/run)
+  LOCAL_AUTOMATION_HOME                  State directory (default: ~/.local-automation)
+  LOCAL_AUTOMATION_WORKSPACE             Agent workspace (default: $LOCAL_AUTOMATION_HOME/workspace)
+  LOCAL_AUTOMATION_ALLOW_EXEC=true       Enable shell execution inside the service sandbox
 `);
+    process.exit(0);
+  }
+
+  if (args.includes("--init-local")) {
+    const passphrase = process.env.LOCAL_AUTOMATION_WALLET_PASSPHRASE;
+    if (!passphrase) {
+      throw new Error("LOCAL_AUTOMATION_WALLET_PASSPHRASE must be set for --init-local");
+    }
+    const stateDir = getAutomatonDir();
+    const workspaceRoot = argumentValue(args, "--workspace")
+      || process.env.LOCAL_AUTOMATION_WORKSPACE
+      || path.join(stateDir, "workspace");
+    const config = initializeLocalRuntime({
+      stateDir,
+      workspaceRoot,
+      passphrase,
+      name: argumentValue(args, "--name") || "local-automation",
+      genesisPrompt: argumentValue(args, "--genesis") || "Operate only within the configured workspace and spending policy.",
+    });
+    logger.info(JSON.stringify({ address: config.walletAddress, configDir: stateDir, workspaceRoot }));
     process.exit(0);
   }
 
@@ -186,19 +214,40 @@ Version:    ${config.version}
 // ─── Main Run ──────────────────────────────────────────────────
 
 async function run(): Promise<void> {
-  logger.info(`[${new Date().toISOString()}] Conway Automaton v${VERSION} starting...`);
+  logger.info(`[${new Date().toISOString()}] Local Automation v${VERSION} starting...`);
 
-  // Load config — first run triggers interactive setup wizard
-  let config = loadConfig();
+  // Local mode is explicit and non-interactive so service startup never opens
+  // a legacy provisioning flow.
+  const config = loadConfig();
   if (!config) {
-    const { runSetupWizard } = await import("./setup/wizard.js");
-    config = await runSetupWizard();
+    throw new Error("Local runtime is not initialized. Run local-automation --init-local first.");
   }
 
-  // Load wallet (chain-aware)
-  const { account, chainIdentity, chainType: walletChainType } = await getWallet();
-  const resolvedChainType = config.chainType || walletChainType || "evm";
   const runtimeSettings = resolveRuntimeSettings(config);
+
+  // Local mode deliberately loads only the encrypted agent wallet. The legacy
+  // plaintext wallet path is retained solely for the explicit migration mode.
+  const wallet = runtimeSettings.mode === "local"
+    ? (() => {
+        const passphrase = process.env.LOCAL_AUTOMATION_WALLET_PASSPHRASE;
+        const stateDir = getAutomatonDir();
+        if (!passphrase || !localWalletExists(stateDir)) {
+          throw new Error(
+            "Local wallet is not initialized. Run --init-local with LOCAL_AUTOMATION_WALLET_PASSPHRASE set.",
+          );
+        }
+        const localWallet = loadLocalWallet({ stateDir, passphrase });
+        const localAccount = privateKeyToAccount(localWallet.privateKey);
+        return {
+          account: localAccount,
+          chainIdentity: new EvmChainIdentity(localAccount),
+          chainType: "evm" as const,
+          isNew: false,
+        };
+      })()
+    : await getWallet();
+  const { account, chainIdentity, chainType: walletChainType } = wallet;
+  const resolvedChainType = config.chainType || walletChainType || "evm";
   const apiKey = runtimeSettings.mode === "local"
     ? runtimeSettings.openrouterApiKey
     : config.conwayApiKey || loadApiKeyFromConfig();

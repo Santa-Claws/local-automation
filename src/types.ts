@@ -89,15 +89,14 @@ export const DEFAULT_CONFIG: Partial<AutomatonConfig> = {
   workspaceRoot: "workspace",
   inferenceModel: "nousresearch/hermes-3-llama-3.1-70b",
   maxTokensPerTurn: 4096,
-  heartbeatConfigPath: "~/.automaton/heartbeat.yml",
-  dbPath: "~/.automaton/state.db",
+  heartbeatConfigPath: "~/.local-automation/heartbeat.yml",
+  dbPath: "~/.local-automation/state.db",
   logLevel: "info",
-  version: "0.2.1",
-  skillsDir: "~/.automaton/skills",
+  version: "0.2.1-local.0",
+  skillsDir: "~/.local-automation/skills",
   maxChildren: 3,
   maxTurnsPerCycle: 25,
   childSandboxMemoryMb: 1024,
-  socialRelayUrl: "https://social.conway.tech",
 };
 
 // ─── Agent State ─────────────────────────────────────────────────

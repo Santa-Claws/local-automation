@@ -9,7 +9,6 @@ import path from "path";
 import type { AutomatonConfig, TreasuryPolicy, ModelStrategyConfig, SoulConfig } from "./types.js";
 import { DEFAULT_CONFIG, DEFAULT_TREASURY_POLICY, DEFAULT_MODEL_STRATEGY_CONFIG, DEFAULT_SOUL_CONFIG } from "./types.js";
 import { getAutomatonDir } from "./identity/wallet.js";
-import { loadApiKeyFromConfig } from "./identity/provision.js";
 import { createLogger } from "./observability/logger.js";
 import type { ChainType } from "./identity/chain.js";
 
@@ -32,7 +31,7 @@ export function loadConfig(): AutomatonConfig | null {
 
   try {
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    const apiKey = raw.conwayApiKey || loadApiKeyFromConfig();
+    const apiKey = raw.conwayApiKey || "";
 
     // Deep-merge treasury policy with defaults
     const treasuryPolicy: TreasuryPolicy = {
